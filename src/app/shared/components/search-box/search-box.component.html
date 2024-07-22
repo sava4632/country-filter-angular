@@ -4,6 +4,7 @@
   [placeholder]="placeholder"
   class="form-control"
   title="searchBox"
+  (keyup)="onKeyPress(txtInput.value)"
   #txtInput
-  (keyup.enter)="emitValue(txtInput.value)"
 />
+<!-- (keyup.enter)="emitValue(txtInput.value)"  -->
