@@ -1,19 +1,49 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { catchError, delay, map, Observable, of } from 'rxjs';
-import { Country } from '../interfaces/country';
+
+import { catchError, delay, map, Observable, of, tap } from 'rxjs';
+
+import { Country } from '../interfaces/country.interface';
+import { CacheStore } from '../interfaces/cache-store.interface';
+import { Region } from '../interfaces/region.type';
 
 @Injectable({ providedIn: 'root' })
 export class CountriesService {
+
   private baseUrl = 'https://restcountries.com/v3.1';
 
-  constructor( private httpClient: HttpClient ) { }
+  // Para almacenar los datos entre vistas
+  public cacheStore: CacheStore = {
+    byCapital:  { term: '', countries: [] },
+    byCountry:  { term: '', countries: [] },
+    byRegion:  { region: '', countries: [] },
+  }
+
+  constructor( private httpClient: HttpClient ) {
+    this.loadToLocalStorage();
+  }
+
+  /**
+   * Metodo para guardar los datos de busqueda en el LocalStorage
+   */
+  private saveToLocalStorage(): void {
+    localStorage.setItem('cacheStore', JSON.stringify( this.cacheStore ));
+  }
+
+  /**
+   * Metodo para recuperar la informacion de busqueda en el LocalStorage
+   */
+  private loadToLocalStorage(): void{
+    if( !localStorage.getItem('cacheStore')) return
+
+    this.cacheStore = JSON.parse( localStorage.getItem('cacheStore')! );
+  }
 
   private getCountriesRequest( url: string ): Observable<Country[]> {
     return this.httpClient.get<Country[]>( url )
     .pipe(
       catchError( () => of([])),
-      // delay( 2000 ), // delay: permite poner un delay antes de retornar los datos
+      delay( 2000 ), // delay: permite poner un delay antes de retornar los datos
     );
   }
 
@@ -39,7 +69,13 @@ export class CountriesService {
    */
   searchCapital(term: string): Observable<Country[]> {
     const url = `${ this.baseUrl }/capital/${ term }`;
-    return this.getCountriesRequest( url );
+    return this.getCountriesRequest( url )
+      .pipe(
+        tap(
+          countries => this.cacheStore.byCapital = { term: term, countries}
+        ),
+        tap( () => this.saveToLocalStorage() )
+      );
   }
 
   /**
@@ -52,6 +88,10 @@ export class CountriesService {
     const url = `${ this.baseUrl }/name/${ term }`;
     return this.httpClient.get<Country[]>( url )
       .pipe(
+        tap(
+          countries => this.cacheStore.byCountry = { term: term, countries}
+        ),
+        tap( () => this.saveToLocalStorage() ),
         catchError( () => of([]))
       );
   }
@@ -62,10 +102,14 @@ export class CountriesService {
    * @returns una lista de países que coinciden con el término de búsqueda. Es un observable que emite un array de objetos de tipo Country.
    * En caso de error, emite un array vacío.
    */
-  searchRegion( term: string ): Observable<Country[]>{
+  searchRegion( term: Region ): Observable<Country[]>{
     const url = `${ this.baseUrl }/region/${ term }`;
     return this.httpClient.get<Country[]>( url )
       .pipe(
+        tap(
+          countries => this.cacheStore.byRegion = { region: term, countries}
+        ),
+        tap( () => this.saveToLocalStorage() ),
         catchError( () => of([]))
       );
   }
